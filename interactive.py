@@ -1,177 +1,158 @@
+import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
-# Load the dataset
-data = pd.read_excel("python.xlsx")
+# Streamlit Page Config
+st.set_page_config(page_title="🌍 Pollution Insights Dashboard", layout="wide")
 
+# App Header
+st.title("🌱 Pollution Data Explorer")
+st.markdown("""
+Use this interactive dashboard to explore pollution metrics city-wise. 
+Upload your dataset and visualize trends, types, outliers, and custom comparisons.
+""")
 
-# Menu
-print("\n📊 Choose an Objective to Visualize:\n")
-print("1. Histogram of Pollutant Average")
-print("2. Bar Chart - Avg Pollution by City")
-print("3. Scatter Plot - Pollution by City and Type")
-print("4. Top 10 Most Polluted Cities")
-print("5. Box Plot - Outlier Detection")
-print("6. Pie Chart - Pollution Types")
-print("7. Correlation Heatmap")
-print("8. IQR calculation")
+# Upload Dataset
+uploaded_file = st.file_uploader("📂 Upload your pollution dataset (.xlsx)", type="xlsx")
 
+if uploaded_file is not None:
+    # Load Data
+    data = pd.read_excel(uploaded_file)
+    st.success("Dataset uploaded successfully!")
 
-choice = input("\nEnter your choice (1-8): ")
+    # Initial View
+    with st.expander("📊 Preview Dataset"):
+        st.dataframe(data.head(10))
 
-# data analysis and cleaning 
+    # Clean Missing Values
+    st.subheader("🛠️ Data Cleaning")
+    method = st.selectbox("Choose method to handle missing values:",
+                          ["Fill with Mean", "Fill with Median", "Fill with Mode", "Drop Rows"])
 
-# Show first 5 rows
-print("HEAD (First 5 rows):\n")
-print(data.head(),"\n")
+    num_cols = ['pollutant_min', 'pollutant_max', 'pollutant_avg']
+    if method == "Fill with Mean":
+        for col in num_cols:
+            data[col] = data[col].fillna(data[col].mean())
+        st.info("Filled with Mean")
+    elif method == "Fill with Median":
+        for col in num_cols:
+            data[col] = data[col].fillna(data[col].median())
+        st.info("Filled with Median")
+    elif method == "Fill with Mode":
+        for col in num_cols:
+            data[col] = data[col].fillna(data[col].mode()[0])
+        st.info("Filled with Mode")
+    elif method == "Drop Rows":
+        data.dropna(inplace=True)
+        st.info("Dropped rows with missing values")
 
-# Show last 5 rows
-print("\nTAIL (Last 5 rows):\n")
-print(data.tail(),"\n")
+    # Remove Duplicates
+    data.drop_duplicates(inplace=True)
 
-# General info about dataset
-data.info()  
+    # Navigation Tabs
+    tab1, tab2, tab3, tab4 = st.tabs(["📈 Prebuilt Analysis", "🎨 Custom Visualization", "📌 Outliers", "📋 Dataset Info"])
 
+    with tab1:
+        st.header("Prebuilt Visualizations")
+        option = st.selectbox("Choose an objective:", [
+            "Histogram - Pollutant Average",
+            "Bar Chart - Avg Pollution by City",
+            "Scatter - Pollution Type in Top 20 Cities",
+            "Top 10 Most Polluted Cities",
+            "Box Plot - Outlier Detection",
+            "Pie Chart - Pollution Types",
+            "Correlation Heatmap"
+        ])
 
-# Gernal Discription Of the DataDet
-print("\nDATASET Discription:\n")
-print(data.describe() ,"\n")
+        fig, ax = plt.subplots(figsize=(12, 6))
 
-print("\nMissing values in each column:\n")
-print(data.isnull().sum())
+        if option == "Histogram - Pollutant Average":
+            ax.hist(data['pollutant_avg'], bins=30, color='skyblue', edgecolor='black')
+            ax.set_title("Distribution of Pollutant Averages")
+        elif option == "Bar Chart - Avg Pollution by City":
+            city_avg = data.groupby('city')['pollutant_avg'].mean().sort_values(ascending=False)
+            city_avg.plot(kind='bar', color='orange', ax=ax)
+            ax.set_title("Average Pollution by City")
+        elif option == "Scatter - Pollution Type in Top 20 Cities":
+            top_cities = data.groupby('city')['pollutant_avg'].mean().sort_values(ascending=False).head(20).index
+            top_data = data[data['city'].isin(top_cities)]
+            for pollutant in top_data['pollutant_id'].unique():
+                pol = top_data[top_data['pollutant_id'] == pollutant]
+                ax.scatter(pol['city'], pol['pollutant_avg'], label=pollutant)
+            ax.set_title("Pollution by Type in Top 20 Cities")
+            ax.legend()
+            plt.xticks(rotation=90)
+        elif option == "Top 10 Most Polluted Cities":
+            top10 = data.groupby('city')['pollutant_avg'].mean().sort_values(ascending=False).head(10)
+            top10.plot(kind='bar', color='red', ax=ax)
+            ax.set_title("Top 10 Polluted Cities")
+        elif option == "Box Plot - Outlier Detection":
+            ax.boxplot(data['pollutant_avg'], vert=False)
+            ax.set_title("Outlier Detection in Pollutant Avg")
+        elif option == "Pie Chart - Pollution Types":
+            type_counts = data['pollutant_id'].value_counts()
+            ax.pie(type_counts, labels=type_counts.index, autopct='%1.1f%%', startangle=140)
+            ax.set_title("Pollution Type Distribution")
+        elif option == "Correlation Heatmap":
+            corr = data[num_cols].corr()
+            fig, ax = plt.subplots()
+            sns.heatmap(corr, annot=True, cmap='coolwarm', ax=ax)
+            st.pyplot(fig)
+            st.stop()
 
-# Fill missing values in numeric columns with the average value (mean)
-pollutant_min_mean = data['pollutant_min'].mean()
-data['pollutant_min'] = data['pollutant_min'].fillna(pollutant_min_mean)
+        st.pyplot(fig)
 
-pollutant_max_mean = data['pollutant_max'].mean()
-data['pollutant_max'] = data['pollutant_max'].fillna(pollutant_max_mean)
+    with tab2:
+        st.header("Custom Visualization")
+        chart_type = st.selectbox("Chart Type", ["Bar", "Line", "Scatter", "Box", "Histogram"])
+        x = st.selectbox("X-axis", data.columns)
+        y = st.selectbox("Y-axis (numerical)", data.select_dtypes(include=np.number).columns)
 
-pollutant_avg = data['pollutant_avg'].mean()
-data['pollutant_avg'] = data['pollutant_avg'].fillna(pollutant_avg)
+        fig, ax = plt.subplots()
+        if chart_type == "Bar":
+            data.groupby(x)[y].mean().plot(kind='bar', ax=ax)
+        elif chart_type == "Line":
+            data.groupby(x)[y].mean().plot(kind='line', ax=ax)
+        elif chart_type == "Scatter":
+            ax.scatter(data[x], data[y], color='teal')
+        elif chart_type == "Box":
+            sns.boxplot(x=data[x], y=data[y], ax=ax)
+        elif chart_type == "Histogram":
+            sns.histplot(data[y], kde=True, ax=ax)
+        ax.set_title(f"{chart_type} Plot: {y} vs {x}")
+        st.pyplot(fig)
 
-# Remove duplicate rows if any are there
-data = data.drop_duplicates()
+    with tab3:
+        st.header("🔍 Outlier Detection (IQR Method)")
+        Q1 = np.percentile(data['pollutant_avg'], 25)
+        Q3 = np.percentile(data['pollutant_avg'], 75)
+        IQR = Q3 - Q1
+        lower = Q1 - 1.5 * IQR
+        upper = Q3 + 1.5 * IQR
 
-# Objective 1
-if choice == "1":
-    plt.hist(data['pollutant_avg'], bins=30, color='skyblue', edgecolor='black')
-    plt.title('Pollutant Average Distribution')
-    plt.xlabel('Pollutant Avg')
-    plt.ylabel('Count')
-    plt.grid(True)
-    plt.show()
+        outliers = data[(data['pollutant_avg'] < lower) | (data['pollutant_avg'] > upper)]
+        st.warning(f"Found {len(outliers)} outliers in pollutant_avg")
+        st.dataframe(outliers[['city', 'pollutant_id', 'pollutant_avg']])
 
-# Objective 2
-elif choice == "2":
-    city_avg = data.groupby('city')['pollutant_avg'].mean()
-    plt.figure(figsize=(14, 6))
-    plt.bar(city_avg.index, city_avg.values, color='orange')
-    plt.title('City vs Pollution Average')
-    plt.xlabel('City')
-    plt.ylabel('Pollution Average')
-    plt.xticks(rotation=75, ha='right')
-    plt.show()
+        clean_data = data[(data['pollutant_avg'] >= lower) & (data['pollutant_avg'] <= upper)]
+        fig, ax = plt.subplots()
+        sns.histplot(clean_data['pollutant_avg'], bins=30, kde=True, color='green', ax=ax)
+        ax.set_title("Pollutant Average (Outliers Removed)")
+        st.pyplot(fig)
 
-# Objective 3: Pollution Types in Top 20 Most Polluted Cities
+    with tab4:
+        st.header("📋 Dataset Overview")
+        st.markdown("#### Column Descriptions")
+        st.dataframe(pd.DataFrame({
+            'Column': data.columns,
+            'Data Type': [str(data[col].dtype) for col in data.columns],
+            'Missing Values': [data[col].isna().sum() for col in data.columns],
+        }))
 
-elif choice == "3":
-    city_avg = data.groupby('city')['pollutant_avg'].mean().sort_values(ascending=False)
-    top_20_cities = city_avg.head(20).index  # get city names
-
-    top20_data = data[data['city'].isin(top_20_cities)]
-
-    plt.figure(figsize=(14, 6))
-
-    for pol_type in top20_data['pollutant_id'].unique():
-        pol_data = top20_data[top20_data['pollutant_id'] == pol_type]
-        plt.scatter(pol_data['city'], pol_data['pollutant_avg'], label=pol_type)
-
-    # Add labels and title
-    plt.title('Pollution Type in Top 20 Most Polluted Cities')
-    plt.xlabel('City')
-    plt.ylabel('Pollutant Average')
-    plt.xticks(rotation=90)
-    plt.legend() 
-    plt.tight_layout()
-    plt.show()
-
-
-# Objective 4
-elif choice == "4":
-    city_avg = data.groupby('city')['pollutant_avg'].mean()
-    top_10 = city_avg.sort_values()[-10:]  # no ascending=False
-    plt.bar(top_10.index, top_10.values, color='red')
-    plt.title('Top 10 Polluted Cities')
-    plt.xlabel('City')
-    plt.ylabel('Avg Pollution')
-    plt.xticks(rotation=45)
-    plt.show()
-
-# Objective 5
-elif choice == "5":
-    plt.boxplot(data['pollutant_avg'], vert=False)
-    plt.title('Pollutant Avg - Outlier Check')
-    plt.xlabel('Pollutant Avg')
-    plt.grid(True)
-    plt.show()
-
-# Objective 6
-elif choice == "6":
-    pollution_type = data['pollutant_id'].value_counts()
-    plt.figure(figsize=(6, 6))
-    slices, texts = plt.pie(pollution_type, labels=None)
-    for i in range(len(pollution_type)):
-        plt.text(slices[i].get_center()[0]*0.6,
-                 slices[i].get_center()[1]*0.6,
-                 str(pollution_type.values[i]),
-                 ha='center', va='center')
-    plt.legend(pollution_type.index, title="Pollutants", loc="best")
-    plt.title('Pollution Types')
-    plt.show()
-
-# Objective 7
-elif choice == "7":
-    small = data[['pollutant_min', 'pollutant_max', 'pollutant_avg']]
-    corr = small.corr()
-    sns.heatmap(corr, annot=True, cmap='coolwarm')
-    plt.title('Correlation between Pollutant Levels')
-    plt.show()
-    
-elif choice == "8":
-    
-    # Calculate 25th and 75th percentile using NumPy
-    Q1 = np.percentile(data['pollutant_avg'], 25)
-    Q3 = np.percentile(data['pollutant_avg'], 75)
-
-    # Calculate IQR
-    IQR = Q3 - Q1
-
-    # Calculate lower and upper bounds
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-
-    # Filter data to get outliers only
-    outliers = data[(data['pollutant_avg'] < lower_bound) | (data['pollutant_avg'] > upper_bound)]
-
-    # Show outlier values
-    print("\n📌 Outlier values based on 'pollutant_avg':\n")
-    print(outliers[['city', 'pollutant_id', 'pollutant_avg', 'last_update']])
-
-    # Filter data to remove outliers
-    data_no_outliers = data[(data['pollutant_avg'] >= lower_bound) & (data['pollutant_avg'] <= upper_bound)]
-
-    # Plot histogram after removing outliers
-    plt.figure(figsize=(8, 6))
-    sns.histplot(data_no_outliers['pollutant_avg'], kde=True, color='green')
-    plt.title('Pollutant Average Distribution (Outliers Removed)')
-    plt.xlabel('Pollutant Average')
-    plt.ylabel('Frequency')
-    plt.tight_layout()
-    plt.show()
-    
+        st.markdown("#### Dataset Summary")
+        st.write(data.describe())
 
 else:
-    print("Invalid choice! Please enter a number between 1 and 7.")
+    st.info("Please upload an Excel file to begin analysis.")
