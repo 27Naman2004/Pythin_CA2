@@ -75,19 +75,29 @@ elif choice == "2":
     plt.xticks(rotation=75, ha='right')
     plt.show()
 
-# Objective 3
+# Objective 3: Pollution Types in Top 20 Most Polluted Cities
+
 elif choice == "3":
+    city_avg = data.groupby('city')['pollutant_avg'].mean().sort_values(ascending=False)
+    top_20_cities = city_avg.head(20).index  # get city names
+
+    top20_data = data[data['city'].isin(top_20_cities)]
+
     plt.figure(figsize=(14, 6))
-    for pollutant in data['pollutant_id'].unique():
-        group = data[data['pollutant_id'] == pollutant]
-        plt.scatter(group['city'], group['pollutant_avg'], label=pollutant, alpha=0.6)
-    plt.xticks(rotation=90)
-    plt.title('Pollution by City and Type')
+
+    for pol_type in top20_data['pollutant_id'].unique():
+        pol_data = top20_data[top20_data['pollutant_id'] == pol_type]
+        plt.scatter(pol_data['city'], pol_data['pollutant_avg'], label=pol_type)
+
+    # Add labels and title
+    plt.title('Pollution Type in Top 20 Most Polluted Cities')
     plt.xlabel('City')
-    plt.ylabel('Pollutant Avg')
-    plt.legend()
+    plt.ylabel('Pollutant Average')
+    plt.xticks(rotation=90)
+    plt.legend() 
     plt.tight_layout()
     plt.show()
+
 
 # Objective 4
 elif choice == "4":
